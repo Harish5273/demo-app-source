@@ -16,7 +16,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::591424882000:role/gitops-platform-github-actions
           aws-region: us-east-1
 
       - uses: aws-actions/amazon-ecr-login@v2
