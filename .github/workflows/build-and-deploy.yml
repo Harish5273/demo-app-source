@@ -1,0 +1,46 @@
+name: build-and-deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
+
+      - name: Build and push image
+        run: |
+          TAG=${GITHUB_SHA::7}
+          docker build --build-arg GIT_SHA=$TAG -t ${{ vars.ECR_URI }}:$TAG .
+          docker push ${{ vars.ECR_URI }}:$TAG
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Harish5273/gitops-platform-manifests
+          token: ${{ secrets.MANIFESTS_PAT }}
+          path: manifests
+
+      - name: Point the manifests repo at the new image
+        run: |
+          cd manifests
+          sed -i "s|^  repository:.*|  repository: ${{ vars.ECR_URI }}|; s|^  tag:.*|  tag: \"$TAG\"|" demo-app/values.yaml
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git commit -am "ci: deploy demo-app $TAG" || exit 0
+          git push
